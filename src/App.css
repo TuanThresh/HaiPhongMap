@@ -1,0 +1,300 @@
+.app {
+  height: 100%;
+  width: 100%;
+  background: #f4f7fb;
+  color: #162033;
+}
+
+.game-shell {
+  position: relative;
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden;
+}
+
+.game-overlay {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 3;
+  width: min(360px, calc(100vw - 36px));
+  display: grid;
+  gap: 12px;
+}
+
+.start-panel,
+.settings-panel,
+.challenge-panel,
+.completion-notification {
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(10px);
+}
+
+.start-panel,
+.settings-panel,
+.challenge-panel {
+  padding: 16px;
+}
+
+.start-panel h1 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.12;
+  letter-spacing: 0;
+}
+
+.start-panel p {
+  margin: 8px 0 14px;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.primary-action,
+.error-panel button,
+.draw-zone-action,
+.dev-actions button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 7px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.primary-action {
+  width: 100%;
+  background: #0f766e;
+  color: #fff;
+  font-size: 15px;
+}
+
+.primary-action:disabled,
+.dev-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.spawn-status {
+  margin-top: 14px;
+  display: grid;
+  gap: 4px;
+  color: #0f766e;
+}
+
+.spawn-status span {
+  color: #475569;
+}
+
+.settings-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-panel label {
+  display: grid;
+  gap: 6px;
+}
+
+.settings-panel span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.settings-panel select,
+.settings-panel input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  border-radius: 7px;
+  background: #fff;
+  color: #0f172a;
+  padding: 0 10px;
+}
+
+.draw-zone-action {
+  background: #0f766e;
+  color: #fff;
+}
+
+.draw-zone-action.active {
+  background: #b45309;
+}
+
+.active-bounds-readout {
+  display: grid;
+  gap: 4px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  background: rgba(20, 184, 166, 0.09);
+}
+
+.active-bounds-readout strong {
+  color: #0f172a;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.guidance-toggle {
+  display: flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 9px;
+}
+
+.guidance-toggle input {
+  width: 18px;
+  min-height: 18px;
+}
+
+.settings-panel select:disabled,
+.settings-panel input:disabled {
+  opacity: 0.7;
+}
+
+.distance-limit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.challenge-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-kicker {
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.challenge-panel header strong {
+  color: #0f172a;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.challenge-details {
+  display: grid;
+  gap: 10px;
+}
+
+.challenge-details div {
+  display: grid;
+  gap: 3px;
+}
+
+.challenge-details span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.challenge-details strong {
+  color: #111827;
+  font-size: 15px;
+  line-height: 1.28;
+  overflow-wrap: anywhere;
+}
+
+.error-panel {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.error-panel span {
+  color: #7f1d1d;
+  line-height: 1.4;
+}
+
+.error-panel button {
+  background: #b91c1c;
+  color: #fff;
+}
+
+.dev-panel {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(15, 23, 42, 0.12);
+  display: grid;
+  gap: 10px;
+}
+
+.dev-panel > span {
+  color: #6d28d9;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.dev-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.dev-actions button {
+  background: #e2e8f0;
+  color: #0f172a;
+  text-align: center;
+}
+
+.completion-notification {
+  position: absolute;
+  right: 18px;
+  bottom: 22px;
+  z-index: 4;
+  display: grid;
+  gap: 4px;
+  min-width: 260px;
+  padding: 14px 16px;
+  color: #064e3b;
+  background: rgba(236, 253, 245, 0.96);
+}
+
+.completion-notification strong {
+  color: #047857;
+}
+
+@media (max-width: 720px) {
+  .game-overlay {
+    top: auto;
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+  }
+
+  .start-panel,
+  .settings-panel,
+  .challenge-panel {
+    padding: 14px;
+  }
+
+  .distance-limit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .start-panel h1 {
+    font-size: 20px;
+  }
+
+  .completion-notification {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    min-width: 0;
+  }
+}

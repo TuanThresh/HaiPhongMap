@@ -1,0 +1,53 @@
+.map-container {
+  height: 100%;
+  width: 100%;
+}
+
+.map-container.drawing-zone {
+  cursor: crosshair;
+}
+
+.player-marker,
+.destination-marker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transform: translateY(-4px);
+  pointer-events: none;
+}
+
+.player-marker-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #0f172a;
+  border: 3px solid #38bdf8;
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.25);
+}
+
+.player-marker-label,
+.destination-marker-label {
+  padding: 4px 7px;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  white-space: nowrap;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+}
+
+.player-marker-label {
+  background: #0f172a;
+}
+
+.destination-marker-star {
+  color: #f59e0b;
+  font-size: 30px;
+  line-height: 1;
+  text-shadow: 0 2px 8px rgba(15, 23, 42, 0.35);
+}
+
+.destination-marker-label {
+  background: #b45309;
+}

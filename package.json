@@ -1,0 +1,36 @@
+{
+  "name": "haiphong-map-challenge",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "shpjs": "^6.2.0",
+    "@duckdb/duckdb-wasm": "^1.32.0",
+    "@geoman-io/maplibre-geoman-free": "^0.6.3",
+    "maplibre-gl": "^5.18.0",
+    "maplibre-gl-components": "^0.15.0",
+    "maplibre-gl-geo-editor": "^0.7.3",
+    "maplibre-gl-layer-control": "^0.14.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.17.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-react-refresh": "^0.4.16",
+    "globals": "^15.14.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.18.2",
+    "vite": "^7.2.4"
+  }
+}
