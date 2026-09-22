@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import maplibregl, {
+  type ExpressionSpecification,
   type GeoJSONSource,
+  type MapGeoJSONFeature,
   type MapMouseEvent,
   type Map as MapLibreMap,
   type Marker,
@@ -17,6 +19,12 @@ import {
 } from '../../config/mapConfig';
 import type { Challenge } from '../../types/game';
 import type { LatLon } from '../../types/poi';
+import type { RoadSelection } from '../../types/trafficSign';
+import {
+  getEmptyOneWayWarningRoadFeatures,
+  getOneWayWarningRoadFeatures,
+  type OneWayWarningRoadFeatureCollection,
+} from '../../services/oneWayWarningRoadService';
 import { createDestinationMarkerElement } from './DestinationMarker';
 import { createPlayerMarkerElement } from './PlayerMarker';
 import './Map.css';
@@ -29,19 +37,97 @@ interface MapViewProps {
   showRouteGuidance: boolean;
   isDrawingCustomZone: boolean;
   onCustomBoundsDrawn: (bounds: MapBounds) => void;
+  onRoadSelected: (road: RoadSelection) => void;
 }
 
 const ROUTE_SOURCE_ID = 'active-route-source';
+const ROUTE_CASING_LAYER_ID = 'active-route-casing-layer';
 const ROUTE_ALT_LAYER_ID = 'active-route-alt-layer';
 const ROUTE_PRIMARY_LAYER_ID = 'active-route-primary-layer';
 const ZONE_SOURCE_ID = 'spawn-zone-source';
 const ZONE_FILL_LAYER_ID = 'spawn-zone-fill-layer';
 const ZONE_LINE_LAYER_ID = 'spawn-zone-line-layer';
+const ONE_WAY_WARNING_SOURCE_ID = 'one-way-warning-source';
+const ONE_WAY_WARNING_CASING_LAYER_ID = 'one-way-warning-casing-layer';
+const ONE_WAY_WARNING_LINE_LAYER_ID = 'one-way-warning-line-layer';
+const ONE_WAY_WARNING_LABEL_LAYER_ID = 'one-way-warning-label-layer';
+const ROAD_CLICK_TOLERANCE_PX = 8;
+
+const INTERNAL_LAYER_IDS = new Set([
+  ROUTE_CASING_LAYER_ID,
+  ROUTE_ALT_LAYER_ID,
+  ROUTE_PRIMARY_LAYER_ID,
+  ZONE_FILL_LAYER_ID,
+  ZONE_LINE_LAYER_ID,
+  ONE_WAY_WARNING_CASING_LAYER_ID,
+  ONE_WAY_WARNING_LINE_LAYER_ID,
+  ONE_WAY_WARNING_LABEL_LAYER_ID,
+]);
+
+const ROAD_NAME_KEYS = [
+  'name',
+  'name:vi',
+  'name_vi',
+  'name:latin',
+  'name_latin',
+  'name:en',
+  'name_en',
+  'ref',
+];
+
+const ROAD_CLASS_KEYS = [
+  'class',
+  'subclass',
+  'highway',
+  'type',
+  'kind',
+];
 
 const emptyRoute = {
   type: 'FeatureCollection' as const,
   features: [],
 };
+
+const routeColorExpression: ExpressionSpecification = [
+  'match',
+  ['get', 'routeIndex'],
+  0,
+  '#2563eb',
+  1,
+  '#f97316',
+  2,
+  '#16a34a',
+  3,
+  '#9333ea',
+  '#dc2626',
+];
+
+const routeOffsetExpression: ExpressionSpecification = [
+  'match',
+  ['get', 'routeIndex'],
+  0,
+  0,
+  1,
+  -5,
+  2,
+  5,
+  3,
+  10,
+  0,
+];
+
+const routeCasingWidthExpression: ExpressionSpecification = [
+  'case',
+  ['==', ['get', 'isPrimary'], true],
+  10,
+  8,
+];
+
+const oneWayWarningLabelExpression: ExpressionSpecification = [
+  'concat',
+  'NGƯỢC CHIỀU · ',
+  ['get', 'label'],
+];
 
 function getRouteData(challenge: Challenge | null, showRouteGuidance: boolean) {
   if (!showRouteGuidance || !challenge || challenge.status !== 'active') {
@@ -81,6 +167,22 @@ function upsertRouteLayer(
   });
 
   map.addLayer({
+    id: ROUTE_CASING_LAYER_ID,
+    type: 'line',
+    source: ROUTE_SOURCE_ID,
+    layout: {
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#ffffff',
+      'line-width': routeCasingWidthExpression,
+      'line-opacity': 0.82,
+      'line-offset': routeOffsetExpression,
+    },
+  });
+
+  map.addLayer({
     id: ROUTE_ALT_LAYER_ID,
     type: 'line',
     source: ROUTE_SOURCE_ID,
@@ -90,9 +192,10 @@ function upsertRouteLayer(
       'line-join': 'round',
     },
     paint: {
-      'line-color': '#60a5fa',
-      'line-width': 4,
-      'line-opacity': 0.52,
+      'line-color': routeColorExpression,
+      'line-width': 5,
+      'line-opacity': 0.88,
+      'line-offset': routeOffsetExpression,
     },
   });
 
@@ -106,9 +209,10 @@ function upsertRouteLayer(
       'line-join': 'round',
     },
     paint: {
-      'line-color': '#1d4ed8',
+      'line-color': routeColorExpression,
       'line-width': 6,
-      'line-opacity': 0.9,
+      'line-opacity': 0.95,
+      'line-offset': routeOffsetExpression,
     },
   });
 }
@@ -134,6 +238,145 @@ function getZoneFeature(bounds: MapBounds): Feature<Polygon> {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function toRoadProperties(feature: MapGeoJSONFeature) {
+  const result: RoadSelection['properties'] = {};
+
+  for (const [key, value] of Object.entries(feature.properties ?? {})) {
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean' ||
+      value === null
+    ) {
+      result[key] = value;
+    }
+  }
+
+  return result;
+}
+
+function getStringProperty(
+  properties: RoadSelection['properties'],
+  keys: string[]
+) {
+  for (const key of keys) {
+    const value = properties[key];
+
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+
+    if (typeof value === 'number') {
+      return String(value);
+    }
+  }
+
+  return null;
+}
+
+function isRoadFeature(feature: MapGeoJSONFeature) {
+  if (INTERNAL_LAYER_IDS.has(feature.layer.id)) {
+    return false;
+  }
+
+  const geometryType = feature.geometry.type;
+  const isLine =
+    geometryType === 'LineString' || geometryType === 'MultiLineString';
+
+  if (!isLine) {
+    return false;
+  }
+
+  const properties = toRoadProperties(feature);
+  const layerId = feature.layer.id.toLowerCase();
+  const roadClass = getStringProperty(properties, ROAD_CLASS_KEYS)?.toLowerCase();
+  const isRailLayer =
+    layerId.includes('rail') ||
+    roadClass === 'rail' ||
+    roadClass === 'transit';
+  const looksLikeRoadLayer =
+    layerId.includes('road') ||
+    layerId.includes('street') ||
+    layerId.includes('motorway') ||
+    layerId.includes('trunk') ||
+    layerId.includes('primary') ||
+    layerId.includes('secondary') ||
+    layerId.includes('tertiary') ||
+    layerId.includes('minor') ||
+    layerId.includes('service') ||
+    layerId.includes('track') ||
+    layerId.includes('path') ||
+    layerId.includes('pedestrian') ||
+    layerId.includes('link') ||
+    layerId.includes('bridge') ||
+    layerId.includes('tunnel');
+
+  if (isRailLayer) {
+    return false;
+  }
+
+  return (
+    looksLikeRoadLayer ||
+    roadClass === 'motorway' ||
+    roadClass === 'trunk' ||
+    roadClass === 'primary' ||
+    roadClass === 'secondary' ||
+    roadClass === 'tertiary' ||
+    roadClass === 'residential' ||
+    roadClass === 'service' ||
+    roadClass === 'unclassified' ||
+    roadClass === 'living_street'
+  );
+}
+
+function getRoadSelectionFromClick(
+  map: MapLibreMap,
+  event: MapMouseEvent
+): RoadSelection | null {
+  const features = map.queryRenderedFeatures([
+    [
+      event.point.x - ROAD_CLICK_TOLERANCE_PX,
+      event.point.y - ROAD_CLICK_TOLERANCE_PX,
+    ],
+    [
+      event.point.x + ROAD_CLICK_TOLERANCE_PX,
+      event.point.y + ROAD_CLICK_TOLERANCE_PX,
+    ],
+  ]);
+  const roadFeature = features.find(isRoadFeature);
+
+  if (!roadFeature) {
+    return null;
+  }
+
+  const properties = toRoadProperties(roadFeature);
+  const className = getStringProperty(properties, ROAD_CLASS_KEYS);
+  const fallbackName = className ? `Đường ${className}` : 'Đường chưa có tên';
+  const name = getStringProperty(properties, ROAD_NAME_KEYS) ?? fallbackName;
+  const position = {
+    lat: event.lngLat.lat,
+    lon: event.lngLat.lng,
+  };
+
+  return {
+    id: [
+      roadFeature.source,
+      roadFeature.sourceLayer,
+      roadFeature.layer.id,
+      roadFeature.id ?? 'unknown',
+      position.lat.toFixed(5),
+      position.lon.toFixed(5),
+    ]
+      .filter(Boolean)
+      .join(':'),
+    name,
+    className,
+    layerId: roadFeature.layer.id,
+    position,
+    properties,
+  };
 }
 
 function createBoundsFromPoints(start: LatLon, end: LatLon): MapBounds {
@@ -206,6 +449,77 @@ function upsertZoneLayer(map: MapLibreMap, bounds: MapBounds) {
   });
 }
 
+function upsertOneWayWarningRoadLayer(
+  map: MapLibreMap,
+  data: OneWayWarningRoadFeatureCollection
+) {
+  const source = map.getSource(ONE_WAY_WARNING_SOURCE_ID) as
+    | GeoJSONSource
+    | undefined;
+
+  if (source) {
+    source.setData(data);
+    return;
+  }
+
+  map.addSource(ONE_WAY_WARNING_SOURCE_ID, {
+    type: 'geojson',
+    data,
+  });
+
+  map.addLayer({
+    id: ONE_WAY_WARNING_CASING_LAYER_ID,
+    type: 'line',
+    source: ONE_WAY_WARNING_SOURCE_ID,
+    layout: {
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#7f1d1d',
+      'line-width': 11,
+      'line-opacity': 0.9,
+    },
+  });
+
+  map.addLayer({
+    id: ONE_WAY_WARNING_LINE_LAYER_ID,
+    type: 'line',
+    source: ONE_WAY_WARNING_SOURCE_ID,
+    layout: {
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#f97316',
+      'line-width': 7,
+      'line-opacity': 0.96,
+      'line-dasharray': [1.2, 0.7],
+    },
+  });
+
+  map.addLayer({
+    id: ONE_WAY_WARNING_LABEL_LAYER_ID,
+    type: 'symbol',
+    source: ONE_WAY_WARNING_SOURCE_ID,
+    layout: {
+      'symbol-placement': 'line',
+      'symbol-spacing': 260,
+      'text-field': oneWayWarningLabelExpression,
+      'text-size': 12,
+      'text-letter-spacing': 0,
+      'text-allow-overlap': false,
+      'text-ignore-placement': false,
+    },
+    paint: {
+      'text-color': '#ffffff',
+      'text-halo-color': '#7f1d1d',
+      'text-halo-width': 2,
+      'text-halo-blur': 0.5,
+    },
+  });
+}
+
 function fitPlayerAndDestination(
   map: MapLibreMap,
   playerPosition: LatLon | null,
@@ -257,6 +571,7 @@ export function MapView({
   showRouteGuidance,
   isDrawingCustomZone,
   onCustomBoundsDrawn,
+  onRoadSelected,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -289,6 +604,7 @@ export function MapView({
         getEffectiveSpawnBounds(spawnZoneId, customBounds)
       );
       upsertRouteLayer(map, null, showRouteGuidance);
+      upsertOneWayWarningRoadLayer(map, getEmptyOneWayWarningRoadFeatures());
       setIsLoaded(true);
     });
 
@@ -300,6 +616,32 @@ export function MapView({
       setIsLoaded(false);
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!map || !isLoaded) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    getOneWayWarningRoadFeatures(controller.signal)
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          upsertOneWayWarningRoadLayer(map, data);
+        }
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          console.warn('Could not load one-way warning roads:', error);
+        }
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [isLoaded]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -387,6 +729,32 @@ export function MapView({
       map.off('mouseup', handleMouseUp);
     };
   }, [isDrawingCustomZone, isLoaded, onCustomBoundsDrawn]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!map || !isLoaded) {
+      return;
+    }
+
+    const handleClick = (event: MapMouseEvent) => {
+      if (isDrawingCustomZone) {
+        return;
+      }
+
+      const road = getRoadSelectionFromClick(map, event);
+
+      if (road) {
+        onRoadSelected(road);
+      }
+    };
+
+    map.on('click', handleClick);
+
+    return () => {
+      map.off('click', handleClick);
+    };
+  }, [isDrawingCustomZone, isLoaded, onRoadSelected]);
 
   useEffect(() => {
     const map = mapRef.current;

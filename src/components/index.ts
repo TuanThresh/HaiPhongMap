@@ -4,4 +4,6 @@ export {
   CompletionNotification,
   GameSettingsPanel,
   StartGamePanel,
+  TrafficSignPanel,
+  type TrafficSignPanelState,
 } from './Game';

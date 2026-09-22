@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   getEffectiveSpawnBounds,
   type MapBounds,
@@ -9,9 +9,19 @@ import {
   GameSettingsPanel,
   MapView,
   StartGamePanel,
+  TrafficSignPanel,
+  type TrafficSignPanelState,
 } from './components';
 import { useGame } from './hooks';
+import { getTrafficSignsForRoad } from './services/trafficSignService';
+import type { RoadSelection } from './types/trafficSign';
 import './App.css';
+
+const INITIAL_TRAFFIC_SIGN_PANEL_STATE: TrafficSignPanelState = {
+  status: 'idle',
+  road: null,
+  signs: [],
+};
 
 function App() {
   const {
@@ -25,6 +35,9 @@ function App() {
     spawnNewAddressPosition,
   } = useGame();
   const [isDrawingCustomZone, setIsDrawingCustomZone] = useState(false);
+  const [trafficSignPanel, setTrafficSignPanel] =
+    useState<TrafficSignPanelState>(INITIAL_TRAFFIC_SIGN_PANEL_STATE);
+  const trafficSignsAbortRef = useRef<AbortController | null>(null);
   const isBusy =
     state.status === 'spawning' || state.status === 'loading_challenge';
   const activeBounds = getEffectiveSpawnBounds(
@@ -43,6 +56,53 @@ function App() {
     [updateSettings]
   );
 
+  const handleRoadSelected = useCallback(async (road: RoadSelection) => {
+    trafficSignsAbortRef.current?.abort();
+
+    const controller = new AbortController();
+    trafficSignsAbortRef.current = controller;
+
+    setTrafficSignPanel({
+      status: 'loading',
+      road,
+      signs: [],
+    });
+
+    try {
+      const signs = await getTrafficSignsForRoad(road, controller.signal);
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      setTrafficSignPanel({
+        status: 'loaded',
+        road,
+        signs,
+      });
+    } catch (error) {
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      setTrafficSignPanel({
+        status: 'error',
+        road,
+        signs: [],
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : 'Không tải được dữ liệu biển giao thông',
+      });
+    }
+  }, []);
+
+  const handleTrafficSignPanelClose = useCallback(() => {
+    trafficSignsAbortRef.current?.abort();
+    trafficSignsAbortRef.current = null;
+    setTrafficSignPanel(INITIAL_TRAFFIC_SIGN_PANEL_STATE);
+  }, []);
+
   return (
     <div className="app">
       <main className="game-shell">
@@ -54,6 +114,7 @@ function App() {
           showRouteGuidance={settings.showRouteGuidance}
           isDrawingCustomZone={isDrawingCustomZone}
           onCustomBoundsDrawn={handleCustomBoundsDrawn}
+          onRoadSelected={handleRoadSelected}
         />
 
         <div className="game-overlay">
@@ -88,6 +149,11 @@ function App() {
             onSpawnNewAddressPosition={spawnNewAddressPosition}
           />
         </div>
+
+        <TrafficSignPanel
+          state={trafficSignPanel}
+          onClose={handleTrafficSignPanelClose}
+        />
 
         <CompletionNotification notice={completionNotice} />
       </main>

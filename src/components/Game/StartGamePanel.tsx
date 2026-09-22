@@ -17,7 +17,7 @@ export function StartGamePanel({
   return (
     <section className="start-panel" aria-label="Game start">
       <h1>HaiPhong Map Challenge</h1>
-      <p>Spawn và target đều là địa chỉ nhà cố định, ví dụ 232 Trại Lẻ.</p>
+      <p>Spawn và target đều là địa chỉ nhà cố định trong danh sách.</p>
       <button
         type="button"
         className="primary-action"

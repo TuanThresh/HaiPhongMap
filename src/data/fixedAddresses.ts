@@ -18,7 +18,6 @@ function fixedAddress(
 }
 
 export const FIXED_ADDRESS_POINTS: Poi[] = [
-  fixedAddress('addr-232-trai-le', '232 Trại Lẻ', 20.8303831, 106.6887641),
   fixedAddress('addr-728-thien-loi', '728 Thiên Lôi', 20.827313, 106.6871552),
   fixedAddress('addr-430-cho-hang', '430 Chợ Hàng', 20.835874, 106.6821481),
   fixedAddress('addr-336-cho-hang', '336 Chợ Hàng', 20.8367733, 106.6839321),
