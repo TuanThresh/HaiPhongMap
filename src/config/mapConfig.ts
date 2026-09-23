@@ -2,10 +2,10 @@ import type { DrawMode, EditMode } from 'maplibre-gl-geo-editor';
 import { API_CONFIG } from './apiConfig';
 
 export const HAI_PHONG_CENTER_BOUNDS = {
-  south: 20.8,
-  north: 20.9,
+  south: 20.77,
+  north: 20.885,
   west: 106.62,
-  east: 106.75,
+  east: 106.84,
 };
 
 export type MapBounds = typeof HAI_PHONG_CENTER_BOUNDS;
@@ -18,8 +18,8 @@ export const HAI_PHONG_FULL_BOUNDS = {
 };
 
 export const HAI_PHONG_CENTER = {
-  lat: 20.8449,
-  lon: 106.6881,
+  lat: 20.829,
+  lon: 106.731,
 };
 
 export const CHALLENGE_MIN_DISTANCE_METERS = 300;

@@ -73,6 +73,19 @@ export function GameSettingsPanel({
         <span>Hiện chỉ dẫn đường đi</span>
       </label>
 
+      <label className="guidance-toggle">
+        <input
+          type="checkbox"
+          checked={settings.showOneWayRoads}
+          onChange={(event) =>
+            onSettingsChange({
+              showOneWayRoads: event.target.checked,
+            })
+          }
+        />
+        <span>Hiện đường 1 chiều</span>
+      </label>
+
       <div className="distance-limit-grid">
         <label>
           <span>Min road distance</span>

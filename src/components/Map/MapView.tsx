@@ -20,6 +20,7 @@ import {
 import type { Challenge } from '../../types/game';
 import type { LatLon } from '../../types/poi';
 import type { RoadSelection } from '../../types/trafficSign';
+import { wardRegionsGeoJSON } from '../../data/wardRegions';
 import {
   getEmptyOneWayWarningRoadFeatures,
   getOneWayWarningRoadFeatures,
@@ -35,6 +36,7 @@ interface MapViewProps {
   spawnZoneId: SpawnZoneId;
   customBounds: MapBounds | null;
   showRouteGuidance: boolean;
+  showOneWayRoads: boolean;
   isDrawingCustomZone: boolean;
   onCustomBoundsDrawn: (bounds: MapBounds) => void;
   onRoadSelected: (road: RoadSelection) => void;
@@ -47,11 +49,21 @@ const ROUTE_PRIMARY_LAYER_ID = 'active-route-primary-layer';
 const ZONE_SOURCE_ID = 'spawn-zone-source';
 const ZONE_FILL_LAYER_ID = 'spawn-zone-fill-layer';
 const ZONE_LINE_LAYER_ID = 'spawn-zone-line-layer';
+const WARD_REGION_SOURCE_ID = 'ward-region-source';
+const WARD_REGION_FILL_LAYER_ID = 'ward-region-fill-layer';
+const WARD_REGION_LINE_LAYER_ID = 'ward-region-line-layer';
+const WARD_REGION_LABEL_LAYER_ID = 'ward-region-label-layer';
 const ONE_WAY_WARNING_SOURCE_ID = 'one-way-warning-source';
 const ONE_WAY_WARNING_CASING_LAYER_ID = 'one-way-warning-casing-layer';
 const ONE_WAY_WARNING_LINE_LAYER_ID = 'one-way-warning-line-layer';
 const ONE_WAY_WARNING_LABEL_LAYER_ID = 'one-way-warning-label-layer';
 const ROAD_CLICK_TOLERANCE_PX = 8;
+
+const ONE_WAY_WARNING_LAYER_IDS = [
+  ONE_WAY_WARNING_CASING_LAYER_ID,
+  ONE_WAY_WARNING_LINE_LAYER_ID,
+  ONE_WAY_WARNING_LABEL_LAYER_ID,
+];
 
 const INTERNAL_LAYER_IDS = new Set([
   ROUTE_CASING_LAYER_ID,
@@ -59,6 +71,9 @@ const INTERNAL_LAYER_IDS = new Set([
   ROUTE_PRIMARY_LAYER_ID,
   ZONE_FILL_LAYER_ID,
   ZONE_LINE_LAYER_ID,
+  WARD_REGION_FILL_LAYER_ID,
+  WARD_REGION_LINE_LAYER_ID,
+  WARD_REGION_LABEL_LAYER_ID,
   ONE_WAY_WARNING_CASING_LAYER_ID,
   ONE_WAY_WARNING_LINE_LAYER_ID,
   ONE_WAY_WARNING_LABEL_LAYER_ID,
@@ -92,14 +107,14 @@ const routeColorExpression: ExpressionSpecification = [
   'match',
   ['get', 'routeIndex'],
   0,
-  '#2563eb',
+  '#fb923c',
   1,
-  '#f97316',
+  '#a3e635',
   2,
-  '#16a34a',
+  '#c084fc',
   3,
-  '#9333ea',
-  '#dc2626',
+  '#facc15',
+  '#fb7185',
 ];
 
 const routeOffsetExpression: ExpressionSpecification = [
@@ -128,6 +143,136 @@ const oneWayWarningLabelExpression: ExpressionSpecification = [
   'NGƯỢC CHIỀU · ',
   ['get', 'label'],
 ];
+
+const wardRegionFillColorExpression: ExpressionSpecification = [
+  'coalesce',
+  ['get', 'color'],
+  '#a855f7',
+];
+
+function setLayerVisibility(
+  map: MapLibreMap,
+  layerIds: string[],
+  visible: boolean
+) {
+  const visibility = visible ? 'visible' : 'none';
+
+  for (const layerId of layerIds) {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, 'visibility', visibility);
+    }
+  }
+}
+
+function setPaintProperty(
+  map: MapLibreMap,
+  layerId: string,
+  property: string,
+  value: unknown
+) {
+  try {
+    map.setPaintProperty(layerId, property, value);
+  } catch {
+    // Some style layers do not support every paint property.
+  }
+}
+
+function getLayerDescriptor(layer: { id: string; [key: string]: unknown }) {
+  const sourceLayer =
+    typeof layer['source-layer'] === 'string' ? layer['source-layer'] : '';
+
+  return `${layer.id} ${sourceLayer}`.toLowerCase();
+}
+
+function applyDungeonMapTheme(map: MapLibreMap) {
+  const layers = map.getStyle().layers ?? [];
+
+  for (const layer of layers) {
+    if (INTERNAL_LAYER_IDS.has(layer.id)) {
+      continue;
+    }
+
+    const descriptor = getLayerDescriptor(layer);
+    const isWater =
+      descriptor.includes('water') ||
+      descriptor.includes('river') ||
+      descriptor.includes('canal');
+    const isGreenSpace =
+      descriptor.includes('park') ||
+      descriptor.includes('wood') ||
+      descriptor.includes('forest') ||
+      descriptor.includes('grass') ||
+      descriptor.includes('landcover');
+    const isRoad =
+      descriptor.includes('road') ||
+      descriptor.includes('street') ||
+      descriptor.includes('highway') ||
+      descriptor.includes('transport');
+    const isBoundary =
+      descriptor.includes('boundary') || descriptor.includes('admin');
+    const isBuilding = descriptor.includes('building');
+
+    if (layer.type === 'background') {
+      setPaintProperty(map, layer.id, 'background-color', '#0b090d');
+      continue;
+    }
+
+    if (layer.type === 'fill') {
+      if (isWater) {
+        setPaintProperty(map, layer.id, 'fill-color', '#111827');
+        setPaintProperty(map, layer.id, 'fill-opacity', 0.96);
+      } else if (isGreenSpace) {
+        setPaintProperty(map, layer.id, 'fill-color', '#132017');
+        setPaintProperty(map, layer.id, 'fill-opacity', 0.88);
+      } else if (isBuilding) {
+        setPaintProperty(map, layer.id, 'fill-color', '#241822');
+        setPaintProperty(map, layer.id, 'fill-opacity', 0.7);
+      } else {
+        setPaintProperty(map, layer.id, 'fill-color', '#161116');
+        setPaintProperty(map, layer.id, 'fill-opacity', 0.9);
+      }
+      continue;
+    }
+
+    if (layer.type === 'line') {
+      if (isRoad) {
+        setPaintProperty(map, layer.id, 'line-color', '#5b3b46');
+        setPaintProperty(map, layer.id, 'line-opacity', 0.9);
+      } else if (isWater) {
+        setPaintProperty(map, layer.id, 'line-color', '#23364a');
+        setPaintProperty(map, layer.id, 'line-opacity', 0.75);
+      } else if (isBoundary) {
+        setPaintProperty(map, layer.id, 'line-color', '#8a5a44');
+        setPaintProperty(map, layer.id, 'line-opacity', 0.6);
+      } else {
+        setPaintProperty(map, layer.id, 'line-color', '#332637');
+        setPaintProperty(map, layer.id, 'line-opacity', 0.72);
+      }
+      continue;
+    }
+
+    if (layer.type === 'symbol') {
+      setPaintProperty(map, layer.id, 'text-color', '#d8c7a6');
+      setPaintProperty(map, layer.id, 'text-halo-color', '#0b090d');
+      setPaintProperty(map, layer.id, 'text-halo-width', 1.2);
+      setPaintProperty(map, layer.id, 'icon-opacity', 0.82);
+      continue;
+    }
+
+    if (layer.type === 'circle') {
+      setPaintProperty(map, layer.id, 'circle-color', '#9a5a2f');
+      setPaintProperty(map, layer.id, 'circle-opacity', 0.75);
+      continue;
+    }
+
+    if (layer.type === 'raster') {
+      setPaintProperty(map, layer.id, 'raster-brightness-max', 0.52);
+      setPaintProperty(map, layer.id, 'raster-brightness-min', 0.02);
+      setPaintProperty(map, layer.id, 'raster-saturation', -0.45);
+      setPaintProperty(map, layer.id, 'raster-contrast', 0.22);
+    }
+  }
+}
 
 function getRouteData(challenge: Challenge | null, showRouteGuidance: boolean) {
   if (!showRouteGuidance || !challenge || challenge.status !== 'active') {
@@ -175,9 +320,9 @@ function upsertRouteLayer(
       'line-join': 'round',
     },
     paint: {
-      'line-color': '#ffffff',
+      'line-color': '#1a0d13',
       'line-width': routeCasingWidthExpression,
-      'line-opacity': 0.82,
+      'line-opacity': 0.9,
       'line-offset': routeOffsetExpression,
     },
   });
@@ -433,7 +578,7 @@ function upsertZoneLayer(map: MapLibreMap, bounds: MapBounds) {
     source: ZONE_SOURCE_ID,
     paint: {
       'fill-color': '#14b8a6',
-      'fill-opacity': 0.08,
+      'fill-opacity': 0.1,
     },
   });
 
@@ -442,9 +587,67 @@ function upsertZoneLayer(map: MapLibreMap, bounds: MapBounds) {
     type: 'line',
     source: ZONE_SOURCE_ID,
     paint: {
-      'line-color': '#0f766e',
+      'line-color': '#84cc16',
       'line-width': 3,
-      'line-dasharray': [2, 2],
+      'line-opacity': 0.82,
+      'line-dasharray': [1.4, 1.6],
+    },
+  });
+}
+
+function upsertWardRegionLayer(map: MapLibreMap) {
+  const source = map.getSource(WARD_REGION_SOURCE_ID) as
+    | GeoJSONSource
+    | undefined;
+
+  if (source) {
+    source.setData(wardRegionsGeoJSON);
+    return;
+  }
+
+  map.addSource(WARD_REGION_SOURCE_ID, {
+    type: 'geojson',
+    data: wardRegionsGeoJSON,
+  });
+
+  map.addLayer({
+    id: WARD_REGION_FILL_LAYER_ID,
+    type: 'fill',
+    source: WARD_REGION_SOURCE_ID,
+    paint: {
+      'fill-color': wardRegionFillColorExpression,
+      'fill-opacity': 0.16,
+    },
+  });
+
+  map.addLayer({
+    id: WARD_REGION_LINE_LAYER_ID,
+    type: 'line',
+    source: WARD_REGION_SOURCE_ID,
+    paint: {
+      'line-color': '#f59e0b',
+      'line-width': 1.6,
+      'line-opacity': 0.58,
+      'line-dasharray': [1.1, 1.7],
+    },
+  });
+
+  map.addLayer({
+    id: WARD_REGION_LABEL_LAYER_ID,
+    type: 'symbol',
+    source: WARD_REGION_SOURCE_ID,
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-size': 12,
+      'text-letter-spacing': 0,
+      'text-allow-overlap': false,
+      'text-ignore-placement': false,
+    },
+    paint: {
+      'text-color': '#f8e4b0',
+      'text-halo-color': '#130c12',
+      'text-halo-width': 1.8,
+      'text-halo-blur': 0.6,
     },
   });
 }
@@ -476,9 +679,9 @@ function upsertOneWayWarningRoadLayer(
       'line-join': 'round',
     },
     paint: {
-      'line-color': '#7f1d1d',
+      'line-color': '#2b090d',
       'line-width': 11,
-      'line-opacity': 0.9,
+      'line-opacity': 0.92,
     },
   });
 
@@ -491,7 +694,7 @@ function upsertOneWayWarningRoadLayer(
       'line-join': 'round',
     },
     paint: {
-      'line-color': '#f97316',
+      'line-color': '#fb923c',
       'line-width': 7,
       'line-opacity': 0.96,
       'line-dasharray': [1.2, 0.7],
@@ -512,8 +715,8 @@ function upsertOneWayWarningRoadLayer(
       'text-ignore-placement': false,
     },
     paint: {
-      'text-color': '#ffffff',
-      'text-halo-color': '#7f1d1d',
+      'text-color': '#fff7ed',
+      'text-halo-color': '#2b090d',
       'text-halo-width': 2,
       'text-halo-blur': 0.5,
     },
@@ -569,6 +772,7 @@ export function MapView({
   spawnZoneId,
   customBounds,
   showRouteGuidance,
+  showOneWayRoads,
   isDrawingCustomZone,
   onCustomBoundsDrawn,
   onRoadSelected,
@@ -599,12 +803,15 @@ export function MapView({
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
 
     map.on('load', () => {
+      applyDungeonMapTheme(map);
+      upsertWardRegionLayer(map);
       upsertZoneLayer(
         map,
         getEffectiveSpawnBounds(spawnZoneId, customBounds)
       );
       upsertRouteLayer(map, null, showRouteGuidance);
       upsertOneWayWarningRoadLayer(map, getEmptyOneWayWarningRoadFeatures());
+      setLayerVisibility(map, ONE_WAY_WARNING_LAYER_IDS, showOneWayRoads);
       setIsLoaded(true);
     });
 
@@ -624,12 +831,19 @@ export function MapView({
       return;
     }
 
+    setLayerVisibility(map, ONE_WAY_WARNING_LAYER_IDS, showOneWayRoads);
+
+    if (!showOneWayRoads) {
+      return;
+    }
+
     const controller = new AbortController();
 
     getOneWayWarningRoadFeatures(controller.signal)
       .then((data) => {
         if (!controller.signal.aborted) {
           upsertOneWayWarningRoadLayer(map, data);
+          setLayerVisibility(map, ONE_WAY_WARNING_LAYER_IDS, true);
         }
       })
       .catch((error) => {
@@ -641,7 +855,7 @@ export function MapView({
     return () => {
       controller.abort();
     };
-  }, [isLoaded]);
+  }, [isLoaded, showOneWayRoads]);
 
   useEffect(() => {
     const map = mapRef.current;

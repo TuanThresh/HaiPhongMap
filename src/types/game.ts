@@ -39,4 +39,5 @@ export interface GameSettings {
   minDistanceMeters: number;
   maxDistanceMeters: number;
   showRouteGuidance: boolean;
+  showOneWayRoads: boolean;
 }

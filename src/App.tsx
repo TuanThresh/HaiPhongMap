@@ -112,6 +112,7 @@ function App() {
           spawnZoneId={settings.spawnZoneId}
           customBounds={settings.customBounds}
           showRouteGuidance={settings.showRouteGuidance}
+          showOneWayRoads={settings.showOneWayRoads}
           isDrawingCustomZone={isDrawingCustomZone}
           onCustomBoundsDrawn={handleCustomBoundsDrawn}
           onRoadSelected={handleRoadSelected}

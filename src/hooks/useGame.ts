@@ -32,6 +32,7 @@ const INITIAL_GAME_SETTINGS: GameSettings = {
   maxDistanceMeters: CHALLENGE_MAX_DISTANCE_METERS,
   customBounds: null,
   showRouteGuidance: true,
+  showOneWayRoads: true,
 };
 
 function pushRecentChallenge(recentChallengeIds: string[], challenge: Challenge) {
